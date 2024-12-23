@@ -5,7 +5,8 @@ go 1.22.2
 require (
 	github.com/gorilla/mux v1.8.1
 	go.mongodb.org/mongo-driver v1.17.1
-	golang.org/x/crypto v0.26.0
+	golang.org/x/crypto v0.26.0 
+
 )
 
 require (

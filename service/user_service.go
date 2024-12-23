@@ -94,15 +94,23 @@ func (s *UserService) DeleteUser(ctx context.Context, id primitive.ObjectID) err
 }
 
 func (s *UserService) ValidateCredentials(ctx context.Context, email, password string) (*models.User, error) {
+	/// 1. 이메일로 사용자 조회
 	user, err := s.repo.GetByEmail(ctx, email)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
 	}
 
+	// 2. 비활성 사용자 체크
+	if !user.IsActive {
+		return nil, errors.New("user is not active")
+	}
+
+	// 3. 비밀번호 검증
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
 		return nil, errors.New("invalid credentials")
 	}
 
+	// 4. 마지막 로그인 시간 업데이트
 	if err := s.repo.UpdateLastLogin(ctx, user.ID); err != nil {
 		// Log error but don't fail the login
 		log.Printf("Failed to update last login: %v", err)
@@ -119,4 +127,15 @@ func (s *UserService) ListUsers(ctx context.Context, page, limit int64) ([]model
 		limit = 10
 	}
 	return s.repo.List(ctx, page, limit)
+}
+
+// 사용자 역할 변경
+func (s *UserService) ChangeUserRole(ctx context.Context, userID primitive.ObjectID, newRole models.UserRole) error {
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	user.Role = newRole
+	return s.repo.Update(ctx, user)
 }
