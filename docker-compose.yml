@@ -8,7 +8,8 @@ services:
     environment:
       - MONGODB_URI=mongodb://mongodb:27017
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy    # MongoDB가 healthy 상태가 될 때까지 기다림
     restart: always
     networks:
       - shopping-network
@@ -19,6 +20,12 @@ services:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
+    healthcheck:                      # MongoDB 헬스체크 추가
+      test: mongosh --eval 'db.runCommand("ping").ok' mongodb://localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - shopping-network
 

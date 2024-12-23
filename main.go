@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -23,27 +24,43 @@ var (
 	userHandler *handler.UserHandler
 )
 
-func init() {
-	// MongoDB 연결
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+func connectDB(mongoURI string) (*mongo.Client, error) {
+	maxRetries := 5
+	var client *mongo.Client
+	var err error
 
+	for i := 0; i < maxRetries; i++ {
+		// MongoDB 연결
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		client, err = mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+		if err == nil {
+			// 연결 테스트
+			if err = client.Ping(ctx, nil); err == nil {
+				log.Printf("Successfully connected to MongoDB on attempt %d", i+1)
+				return client, nil
+			}
+		}
+
+		log.Printf("Failed to connect to MongoDB (attempt %d/%d): %v", i+1, maxRetries, err)
+		time.Sleep(5 * time.Second)
+	}
+
+	return nil, fmt.Errorf("failed to connect to MongoDB after %d attempts", maxRetries)
+}
+
+func init() {
 	mongoURI := os.Getenv("MONGODB_URI")
 	if mongoURI == "" {
 		mongoURI = "mongodb://localhost:27017"
 	}
 
-	// MongoDB 클라이언트 생성
+	// MongoDB 연결 시도
 	var err error
-	mongoClient, err = mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	mongoClient, err = connectDB(mongoURI)
 	if err != nil {
-		log.Fatal("Failed to connect to MongoDB:", err)
-	}
-
-	// MongoDB 연결 테스트
-	err = mongoClient.Ping(ctx, nil)
-	if err != nil {
-		log.Fatal("Failed to ping MongoDB:", err)
+		log.Fatal("Could not establish MongoDB connection:", err)
 	}
 
 	// 데이터베이스 및 의존성 초기화
